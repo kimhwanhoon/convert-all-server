@@ -1,0 +1,7 @@
+{
+  "extends": ["prettier"],
+  "rules": {
+    "trailing-comma": "error",
+    "no-unused-vars": "error"
+  }
+}
