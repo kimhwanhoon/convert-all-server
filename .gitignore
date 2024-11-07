@@ -1,0 +1,15 @@
+/node_modules
+node_modules/*
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# production
+/build
+
+# env files (can opt-in for commiting if needed)
+.env*node_modules/
