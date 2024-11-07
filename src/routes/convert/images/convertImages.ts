@@ -8,7 +8,7 @@ const router = Router();
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB로 파일 크기 제한
+  limits: { fileSize: 10 * 1024 * 1024 }, // 5MB로 파일 크기 제한
 });
 
 // 이미지 변환 API 엔드포인트
