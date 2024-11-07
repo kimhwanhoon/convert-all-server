@@ -40,6 +40,16 @@ const validateApiKey = (
 app.use(validateApiKey);
 app.use('/', routes);
 
+// 메모리 사용량 모니터링 추가
+app.get('/health', (req: Request, res: Response) => {
+  const used = process.memoryUsage();
+  res.json({
+    rss: `${Math.round((used.rss / 1024 / 1024) * 100) / 100} MB`,
+    heapTotal: `${Math.round((used.heapTotal / 1024 / 1024) * 100) / 100} MB`,
+    heapUsed: `${Math.round((used.heapUsed / 1024 / 1024) * 100) / 100} MB`,
+  });
+});
+
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
