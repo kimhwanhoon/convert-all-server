@@ -1,90 +1,166 @@
 import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
-import sharp from 'sharp';
+import sharp, { FormatEnum } from 'sharp';
 
 const router = Router();
 
-// 메모리에 파일을 저장하도록 multer 설정
+// 파일 업로드 설정
 const storage = multer.memoryStorage();
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB 제한
-
-router.get('/', (req: Request, res: Response) => {
-  res.send('get request received');
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB로 파일 크기 제한
 });
 
+// 이미지 변환 API 엔드포인트
 router.post('/', upload.any(), async (req: Request, res: Response) => {
-  // body에서 output format 받기
-  const format = req.body.format;
-  const quality = Number(req.body.quality);
-  const width = Number(req.body.width);
-  const height = Number(req.body.height);
+  // 요청 파라미터 추출
+  const {
+    format,
+    quality: qualityStr,
+    width: widthStr,
+    height: heightStr,
+  } = req.body;
+  const quality = Number(qualityStr);
+  const width = Number(widthStr);
+  const height = Number(heightStr);
 
-  // format이 없는 경우 에러 반환
+  // 필수 파라미터 검증
   if (!format) {
-    res.status(400).send('Format is required');
-    return;
+    return res.status(400).send('Format is required');
   }
 
   try {
-    // req.files는 배열 형태이며 각 파일 객체에 buffer가 포함되어 있습니다.
     const files = req.files as Express.Multer.File[];
 
-    if (!files || files.length === 0) {
-      res.status(400).send('No files uploaded');
-      return;
+    // 파일 업로드 검증
+    if (!files?.length) {
+      return res.status(400).send('No files uploaded');
     }
 
-    // 각 파일의 buffer 데이터를 처리
+    // 최대 파일 개수 검증
+    const MAX_FILES = 5;
+    if (files.length > MAX_FILES) {
+      return res.status(400).send(`Maximum ${MAX_FILES} files allowed at once`);
+    }
+
+    // 이미지 변환 처리
     const convertedImages = await Promise.all(
-      files.map(async (file, index) => {
-        // Sharp로 이미지 변환
-        let image = sharp(file.buffer);
+      files.map(async (file) => {
+        const convertedImage = await convertImage({
+          buffer: file.buffer,
+          format,
+          quality,
+          width,
+          height,
+        });
 
-        // width와 height가 null이거나 0이 아닐 때만 리사이징
-        if (width && height) {
-          image = image.resize(width, height);
-        }
+        // 메모리 해제
+        file.buffer = Buffer.from([]);
 
-        return await image.toFormat(format, { quality }).toBuffer();
+        return {
+          buffer: convertedImage,
+          originalName: file.originalname,
+        };
       })
     );
 
-    // 변환된 파일의 개수가 1이면 바로 보내고, 그렇지 않으면 압축해서 압축파일로 내보낸다.
+    // 결과 반환
     if (convertedImages.length === 1) {
-      res.set('Content-Type', `image/${format}`);
-      res.status(200).send(convertedImages[0]);
-      return;
+      return sendSingleImage(res, convertedImages[0].buffer, format);
     } else {
-      res.set('Content-Type', 'application/zip');
-      res.set(
-        'Content-Disposition',
-        'attachment; filename=converted_images.zip'
-      );
-
-      const archiver = require('archiver');
-      const archive = archiver('zip', {
-        zlib: { level: 9 }, // 최대 압축
-      });
-
-      archive.on('error', (err: any) => {
-        throw err;
-      });
-
-      archive.pipe(res);
-
-      convertedImages.forEach((image, index) => {
-        archive.append(image, { name: `image_${index + 1}.${format}` });
-      });
-
-      await archive.finalize();
-
-      return;
+      return sendZippedImages(res, convertedImages, format);
     }
   } catch (error) {
     console.error('Image conversion error:', error);
-    res.status(500).send('Image conversion failed');
-    return;
+    return res.status(500).send('Image conversion failed');
   }
 });
+
+// 단일 이미지 변환 함수
+async function convertImage({
+  buffer,
+  format,
+  quality,
+  width,
+  height,
+}: {
+  buffer: Buffer;
+  format: string;
+  quality: number;
+  width?: number;
+  height?: number;
+}) {
+  let image = sharp(buffer);
+  const metadata = await image.metadata();
+
+  // 이미지 크기 최적화
+  const MAX_PIXELS = 4000 * 4000;
+  if (
+    metadata.width &&
+    metadata.height &&
+    metadata.width * metadata.height > MAX_PIXELS
+  ) {
+    const ratio = Math.sqrt(MAX_PIXELS / (metadata.width * metadata.height));
+    image = image.resize({
+      width: Math.round(metadata.width * ratio),
+      height: Math.round(metadata.height * ratio),
+      fit: 'inside',
+      withoutEnlargement: true,
+    });
+  }
+
+  // 사용자 지정 크기로 리사이즈
+  if (width && height) {
+    image = image.resize(width, height, {
+      withoutEnlargement: true,
+    });
+  }
+
+  // 이미지 포맷 변환
+  return image
+    .toFormat(format as keyof FormatEnum, {
+      quality,
+      compression: format === 'heic' ? 'av1' : 'lz4',
+    })
+    .toBuffer();
+}
+
+// 단일 이미지 응답 함수
+function sendSingleImage(res: Response, buffer: Buffer, format: string) {
+  res.set('Content-Type', `image/${format}`);
+  return res.status(200).send(buffer);
+}
+
+// 다중 이미지 ZIP 응답 함수
+async function sendZippedImages(
+  res: Response,
+  images: { buffer: Buffer; originalName: string }[],
+  format: string
+) {
+  res.set('Content-Type', 'application/zip');
+  res.set('Content-Disposition', 'attachment; filename=converted_images.zip');
+
+  const archiver = require('archiver');
+  const archive = archiver('zip', {
+    zlib: { level: 3 },
+  });
+
+  archive.on('error', (err: any) => {
+    throw err;
+  });
+
+  archive.pipe(res);
+
+  // ZIP 파일에 이미지 추가
+  for (const image of images) {
+    const fileName = image.originalName.replace(/\.[^/.]+$/, '');
+    archive.append(image.buffer, {
+      name: `${fileName}.${format}`,
+    });
+    image.buffer = Buffer.from([]); // 메모리 해제
+  }
+
+  return archive.finalize();
+}
 
 export default router;
