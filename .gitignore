@@ -1,5 +1,4 @@
 /node_modules
-node_modules/*
 /.pnp
 .pnp.*
 .yarn/*
@@ -13,3 +12,5 @@ node_modules/*
 
 # env files (can opt-in for commiting if needed)
 .env*node_modules/
+
+/dist
