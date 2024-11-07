@@ -4,7 +4,7 @@
   "main": "index.ts",
   "scripts": {
     "start": "node --max-old-space-size=256 dist/app.js",
-    "build": "tsc",
+    "build": "npm ci --omit=dev && tsc",
     "dev": "nodemon"
   },
   "author": "",
