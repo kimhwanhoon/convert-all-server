@@ -4,8 +4,10 @@
   "main": "index.ts",
   "scripts": {
     "start": "node --max-old-space-size=256 dist/app.js",
-    "build": "npm ci --omit=dev && npx tsc",
-    "dev": "nodemon"
+    "build": "tsc",
+    "dev": "nodemon",
+    "clean": "rm -rf dist",
+    "prebuild": "npm run clean"
   },
   "author": "",
   "license": "ISC",
