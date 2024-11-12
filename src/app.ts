@@ -31,4 +31,4 @@ app.listen(port, () => {
 });
 
 // 메모리 사용량 모니터링 추가
-setInterval(resourceLogger, 1000);
+// setInterval(resourceLogger, 1000);

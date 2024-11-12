@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "main": "index.ts",
   "scripts": {
-    "start": "node --max-old-space-size=256 dist/app.js",
+    "start": "node --max-old-space-size=256 --expose-gc dist/app.js",
     "build": "tsc",
-    "dev": "nodemon",
+    "dev": "nodemon --node-args='--expose-gc'",
     "clean": "rm -rf dist",
     "prebuild": "npm run clean"
   },
@@ -18,7 +18,9 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "multer": "^1.4.5-lts.1",
-    "sharp": "^0.33.5"
+    "png-to-ico": "^2.1.8",
+    "sharp": "^0.33.5",
+    "svg2img": "^1.0.0-beta.2"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
