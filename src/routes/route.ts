@@ -1,8 +1,10 @@
 import { Router } from 'express';
-import convertImages from './convert/images/convertImages';
+import { convertImagesRouter } from './convert/images/route';
+import { healthLogRouter } from './health/log/route';
 
 const router = Router();
 
-router.use('/convert/images', convertImages);
+router.use('/convert/images', convertImagesRouter);
+router.use('/health/log', healthLogRouter);
 
-export default router;
+export { router as routes };

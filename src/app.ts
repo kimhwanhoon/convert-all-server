@@ -1,7 +1,9 @@
 import 'dotenv/config';
-import express, { NextFunction, Request, Response } from 'express';
+import express, { Request, RequestHandler, Response } from 'express';
 import cors from 'cors';
-import routes from './routes/route';
+import { routes } from './routes/route';
+import { validateApiKey } from './lib/validateApiKey';
+import resourceLogger from './lib/log/resourceLogger';
 
 const app = express();
 const port = process.env.PORT || 8000;
@@ -17,39 +19,16 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// API 키 확인 미들웨어를 별도 함수로 분리
-const validateApiKey = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  const authHeader = req.headers['authorization'];
-  if (!authHeader?.startsWith('Bearer ')) {
-    res.status(403).send('Forbidden: Invalid Authorization Header');
-    return;
-  }
-
-  const token = authHeader.split(' ')[1];
-  if (token !== process.env.API_KEY) {
-    res.status(403).send('Forbidden: Invalid API Key');
-    return;
-  }
-  next();
-};
-
-app.use(validateApiKey);
+app.use(validateApiKey as RequestHandler);
 app.use('/', routes);
 
-// 메모리 사용량 모니터링 추가
-app.get('/health', (req: Request, res: Response) => {
-  const used = process.memoryUsage();
-  res.json({
-    rss: `${Math.round((used.rss / 1024 / 1024) * 100) / 100} MB`,
-    heapTotal: `${Math.round((used.heapTotal / 1024 / 1024) * 100) / 100} MB`,
-    heapUsed: `${Math.round((used.heapUsed / 1024 / 1024) * 100) / 100} MB`,
-  });
+app.get('/', (req: Request, res: Response) => {
+  res.send('Hello World');
 });
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
+
+// 메모리 사용량 모니터링 추가
+setInterval(resourceLogger, 1000);

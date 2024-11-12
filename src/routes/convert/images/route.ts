@@ -1,18 +1,23 @@
 import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import sharp, { FormatEnum } from 'sharp';
+import pLimit from 'p-limit';
 
 const router = Router();
+
+// 병렬 처리 제한 설정
+const limit = pLimit(4); // 동시에 4개의 작업만 실행
 
 // 파일 업로드 설정
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 5MB로 파일 크기 제한
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB로 파일 크기 제한
 });
 
 // 이미지 변환 API 엔드포인트
 router.post('/', upload.any(), async (req: Request, res: Response) => {
+  console.log('post request received');
   // 요청 파라미터 추출
   const {
     format,
@@ -43,25 +48,27 @@ router.post('/', upload.any(), async (req: Request, res: Response) => {
       return res.status(400).send(`Maximum ${MAX_FILES} files allowed at once`);
     }
 
-    // 이미지 변환 처리
+    // 이미지 변환 처리를 병렬로 실행
     const convertedImages = await Promise.all(
-      files.map(async (file) => {
-        const convertedImage = await convertImage({
-          buffer: file.buffer,
-          format,
-          quality,
-          width,
-          height,
-        });
+      files.map((file) =>
+        limit(async () => {
+          const convertedImage = await convertImage({
+            buffer: file.buffer,
+            format,
+            quality,
+            width,
+            height,
+          });
 
-        // 메모리 해제
-        file.buffer = Buffer.from([]);
+          // 메모리 해제
+          file.buffer = Buffer.from([]);
 
-        return {
-          buffer: convertedImage,
-          originalName: file.originalname,
-        };
-      })
+          return {
+            buffer: convertedImage,
+            originalName: file.originalname,
+          };
+        })
+      )
     );
 
     // 결과 반환
@@ -151,16 +158,18 @@ async function sendZippedImages(
 
   archive.pipe(res);
 
-  // ZIP 파일에 이미지 추가
-  for (const image of images) {
-    const fileName = image.originalName.replace(/\.[^/.]+$/, '');
-    archive.append(image.buffer, {
-      name: `${fileName}.${format}`,
-    });
-    image.buffer = Buffer.from([]); // 메모리 해제
-  }
+  // ZIP 파일에 이미지 추가를 병렬로 처리
+  await Promise.all(
+    images.map(async (image) => {
+      const fileName = image.originalName.replace(/\.[^/.]+$/, '');
+      archive.append(image.buffer, {
+        name: `${fileName}.${format}`,
+      });
+      image.buffer = Buffer.from([]); // 메모리 해제
+    })
+  );
 
   return archive.finalize();
 }
 
-export default router;
+export { router as convertImagesRouter };
