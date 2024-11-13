@@ -176,12 +176,16 @@ async function convertImage({
       const pngToIco = require('png-to-ico');
       let pngBuffer;
 
+      // ICO 변환을 위해 256x256 정사각형 이미지로 리사이징
+      const resizedPipeline = pipeline.resize(width, height, {
+        fit: 'contain',
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      });
+
       if (metadata.format === 'png') {
-        // 이미 PNG인 경우 resize만 적용
-        pngBuffer = await pipeline.toBuffer();
+        pngBuffer = await resizedPipeline.toBuffer();
       } else {
-        // PNG가 아닌 경우 PNG로 변환
-        pngBuffer = await pipeline.png().toBuffer();
+        pngBuffer = await resizedPipeline.png().toBuffer();
       }
 
       const icoBuffer = await pngToIco(pngBuffer);

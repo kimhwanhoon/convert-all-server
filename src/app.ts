@@ -3,18 +3,29 @@ import express, { Request, RequestHandler, Response } from 'express';
 import cors from 'cors';
 import { routes } from './routes/route';
 import { validateApiKey } from './lib/validateApiKey';
-import resourceLogger from './lib/log/resourceLogger';
+// import resourceLogger from './lib/log/resourceLogger';
 
 const app = express();
 const port = process.env.PORT || 8000;
 
-const allowedOrigins = process.env.ORIGIN ? [process.env.ORIGIN] : [];
+const allowedOrigins = process.env.ORIGIN
+  ? process.env.ORIGIN.split(',').map((origin) => origin.trim())
+  : ['https://convert-all.hwanhoon.kim', 'http://localhost:3000'];
 
-// 타입 안전성을 위한 cors 옵션 타입 정의
 const corsOptions = {
-  origin: allowedOrigins,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // 허용할 HTTP 메서드 명시
-  credentials: true, // 필요한 경우 credentials 설정
+  origin: (
+    origin: string | undefined,
+    callback: (err: Error | null, allow?: boolean) => void
+  ) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true,
+  optionsSuccessStatus: 200,
 };
 
 app.use(cors(corsOptions));
