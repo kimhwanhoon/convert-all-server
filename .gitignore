@@ -13,5 +13,6 @@
 # env files (can opt-in for commiting if needed)
 .env
 .DS_Store
+package-lock.json
 
 /dist
