@@ -11,6 +11,7 @@
 /build
 
 # env files (can opt-in for commiting if needed)
-.env*node_modules/
+.env*
+node_modules/
 
 /dist
